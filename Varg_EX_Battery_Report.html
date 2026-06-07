@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stark Varg EX — Battery Diagnostic Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --black:   #080910;
+  --deep:    #0e0f16;
+  --card:    #13141d;
+  --card2:   #181924;
+  --border:  #22243a;
+  --border2: #2e3050;
+  --text:    #dde0f0;
+  --muted:   #7077a0;
+  --dim:     #3a3d5c;
+  --yellow:  #f5c842;
+  --green:   #28c76f;
+  --orange:  #f0833a;
+  --red:     #e03c3c;
+  --blue:    #4a9eda;
+  --green-t: rgba(40,199,111,0.10);
+  --orange-t:rgba(240,131,58,0.10);
+  --red-t:   rgba(224,60,60,0.10);
+  --blue-t:  rgba(74,158,218,0.10);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--black);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ── NOISE OVERLAY ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.6;
+}
+
+/* ── LAYOUT ── */
+.page { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 28px 80px; }
+
+/* ── HEADER ── */
+.header {
+  padding: 52px 0 36px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 48px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  align-items: end;
+}
+.header-left {}
+.eyebrow {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  color: var(--yellow);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+h1 {
+  font-family: 'Azeret Mono', monospace;
+  font-size: clamp(22px, 3vw, 34px);
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+.header-meta {
+  display: flex;
+  gap: 28px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+.meta-item { font-size: 12px; }
+.meta-key {
+  font-family: 'Azeret Mono', monospace;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 2px;
+}
+.meta-val { color: var(--text); font-weight: 500; }
+.header-right { text-align: right; }
+.vin {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-family: 'Azeret Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-top: 10px;
+}
+.pill-critical { background: var(--red-t); color: var(--red); border: 1px solid rgba(224,60,60,0.3); }
+.pill-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* ── SECTION TITLES ── */
+.section { margin-bottom: 56px; }
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.section-num {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 10px;
+  color: var(--dim);
+  letter-spacing: 0.1em;
+  width: 28px;
+  flex-shrink: 0;
+}
+.section-title {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.section-line { flex: 1; height: 1px; background: var(--border); }
+
+/* ── STAT GRID ── */
+.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+.stat-label {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.stat-value {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text);
+}
+.stat-value.red { color: var(--red); }
+.stat-value.orange { color: var(--orange); }
+.stat-value.green { color: var(--green); }
+.stat-unit { font-size: 12px; font-weight: 400; color: var(--muted); margin-left: 3px; }
+.stat-sub { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+/* ── ALERT BOXES ── */
+.alert {
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+  border-left: 3px solid;
+  position: relative;
+}
+.alert-red    { background: var(--red-t);    border-color: var(--red);    }
+.alert-orange { background: var(--orange-t); border-color: var(--orange); }
+.alert-green  { background: var(--green-t);  border-color: var(--green);  }
+.alert-blue   { background: var(--blue-t);   border-color: var(--blue);   }
+.alert-head {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.alert-red    .alert-head { color: var(--red);    }
+.alert-orange .alert-head { color: var(--orange); }
+.alert-green  .alert-head { color: var(--green);  }
+.alert-blue   .alert-head { color: var(--blue);   }
+.alert-body { font-size: 13px; color: var(--muted); line-height: 1.65; }
+
+/* ── USAGE GRID ── */
+.usage-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.usage-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  border-left: 3px solid var(--green);
+}
+.usage-label {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.usage-value {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 5px;
+}
+.usage-desc { font-size: 11px; color: var(--muted); }
+
+/* ── TABLE ── */
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table th {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 10px 12px;
+  background: var(--card2);
+  border-bottom: 1px solid var(--border);
+}
+.data-table td {
+  padding: 9px 12px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr.row-normal td { background: var(--card); }
+.data-table tr.row-warn td   { background: rgba(240,131,58,0.04); }
+.data-table tr.row-red td    { background: rgba(224,60,60,0.06); }
+.td-date {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.td-date.red    { color: var(--red); }
+.td-date.orange { color: var(--orange); }
+.td-date.green  { color: var(--green); }
+.td-mono { font-family: 'Azeret Mono', monospace; font-size: 11px; }
+.td-red    { color: var(--red);    font-weight: 600; }
+.td-orange { color: var(--orange); font-weight: 600; }
+.td-green  { color: var(--green);  }
+.td-muted  { color: var(--muted);  }
+.td-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-family: 'Azeret Mono', monospace;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.badge-red    { background: var(--red-t);    color: var(--red);    border: 1px solid rgba(224,60,60,0.3); }
+.badge-orange { background: var(--orange-t); color: var(--orange); border: 1px solid rgba(240,131,58,0.3); }
+.badge-green  { background: var(--green-t);  color: var(--green);  border: 1px solid rgba(40,199,111,0.3); }
+.badge-muted  { background: rgba(112,119,160,0.1); color: var(--muted); border: 1px solid rgba(112,119,160,0.2); }
+
+/* ── CELL TRAJECTORY ── */
+.trajectory {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.traj-row {
+  display: grid;
+  grid-template-columns: 130px 110px 140px 1fr;
+  gap: 16px;
+  align-items: start;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+.traj-row:last-child { border-bottom: none; }
+.traj-date { font-family: 'Azeret Mono', monospace; font-size: 11px; font-weight: 600; color: var(--text); }
+.traj-soc  { font-family: 'Azeret Mono', monospace; font-size: 11px; color: var(--muted); }
+.traj-val  { font-family: 'Azeret Mono', monospace; font-size: 13px; font-weight: 700; }
+.traj-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+/* ── CHART (SVG bars) ── */
+.chart-container {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  overflow-x: auto;
+}
+.chart-title {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+.chart-legend { display: flex; gap: 20px; margin-top: 14px; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+/* ── FINDINGS GRID ── */
+.findings-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.finding-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+.finding-num {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 9px;
+  color: var(--dim);
+  letter-spacing: 0.1em;
+  margin-bottom: 8px;
+}
+.finding-head {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 7px;
+  line-height: 1.4;
+}
+.finding-body { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+/* ── REQUESTS ── */
+.request-list { display: flex; flex-direction: column; gap: 10px; }
+.request-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 20px;
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+.request-num {
+  width: 36px; height: 36px;
+  background: var(--yellow);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Azeret Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--black);
+  flex-shrink: 0;
+}
+.request-head { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 5px; }
+.request-body { font-size: 12px; color: var(--muted); line-height: 1.55; }
+
+/* ── FOOTER ── */
+.footer {
+  border-top: 1px solid var(--border);
+  padding: 24px 0 0;
+  margin-top: 56px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--dim);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.footer-mono { font-family: 'Azeret Mono', monospace; font-size: 10px; }
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.section { animation: fadeUp 0.5s ease both; }
+.section:nth-child(1) { animation-delay: 0.05s; }
+.section:nth-child(2) { animation-delay: 0.10s; }
+.section:nth-child(3) { animation-delay: 0.15s; }
+.section:nth-child(4) { animation-delay: 0.20s; }
+.section:nth-child(5) { animation-delay: 0.25s; }
+.section:nth-child(6) { animation-delay: 0.30s; }
+.section:nth-child(7) { animation-delay: 0.35s; }
+.section:nth-child(8) { animation-delay: 0.40s; }
+
+@media (max-width: 720px) {
+  .stat-grid { grid-template-columns: repeat(2,1fr); }
+  .usage-grid { grid-template-columns: repeat(2,1fr); }
+  .findings-grid { grid-template-columns: 1fr; }
+  .traj-row { grid-template-columns: 1fr 1fr; }
+  .traj-desc { grid-column: 1/-1; }
+  .header { grid-template-columns: 1fr; }
+  .header-right { text-align: left; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ── HEADER ── -->
+<header class="header">
+  <div class="header-left">
+    <div class="eyebrow">Battery Diagnostic Report · June 2026</div>
+    <h1>Stark Varg EX<br>Battery Cell Analysis</h1>
+    <div class="header-meta">
+      <div class="meta-item"><span class="meta-key">VIN</span><span class="meta-val">UDUEX1AE6SA006014</span></div>
+      <div class="meta-item"><span class="meta-key">Model</span><span class="meta-val">2025 Stark Varg EX</span></div>
+      <div class="meta-item"><span class="meta-key">Odometer</span><span class="meta-val">108,226 m</span></div>
+      <div class="meta-item"><span class="meta-key">Total ride time</span><span class="meta-val">~60.9 h</span></div>
+      <div class="meta-item"><span class="meta-key">Data period</span><span class="meta-val">07 Mar – 06 Jun 2026</span></div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="vin">13 JSON snapshots · 18 app readings · Svag</div>
+    <div class="status-pill pill-critical"><span class="pill-dot"></span>Critical alert active</div>
+  </div>
+</header>
+
+<!-- ── S1: KEY METRICS ── -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">01</span>
+    <span class="section-title">Current status — most recent readings (06 Jun 2026)</span>
+    <div class="section-line"></div>
+  </div>
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-label">Pack delta — post charge</div>
+      <div class="stat-value red">0.127<span class="stat-unit">v</span></div>
+      <div class="stat-sub">At 100% SoC · baseline was 0.013v</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Pack delta — post ride</div>
+      <div class="stat-value red">0.108<span class="stat-unit">v</span></div>
+      <div class="stat-sub">At 68% SoC · app: critically high</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Cell 82 at 100% SoC</div>
+      <div class="stat-value red">−93<span class="stat-unit">mV</span></div>
+      <div class="stat-sub">4.068v vs pack avg 4.161v</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Cell 60 at 100% SoC</div>
+      <div class="stat-value orange">−46<span class="stat-unit">mV</span></div>
+      <div class="stat-sub">4.115v vs pack avg 4.161v</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── S2: CRITICAL FINDINGS ── -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">02</span>
+    <span class="section-title">Critical findings</span>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="alert alert-red">
+    <div class="alert-head">Cell 82: Capacity failure confirmed at 100% SoC</div>
+    <div class="alert-body">Cell 82: 4.068v vs pack average 4.161v immediately after full overnight charge. Deficit −93mV at 100% SoC; −103mV post-ride at 68% SoC. On 01 June: −187mV at 36% SoC — largest deviation in the dataset. Balancer cannot reconcile this deficit.</div>
+  </div>
+
+  <div class="alert alert-orange">
+    <div class="alert-head">Cell 60: Secondary degradation also visible at 100% SoC</div>
+    <div class="alert-body">Cell 60: 4.115v vs pack average 4.161v at full charge. −46mV at 100% SoC. First appeared 01 June (−25mV at 36% SoC). Present in all subsequent readings.</div>
+  </div>
+
+  <div class="alert alert-orange">
+    <div class="alert-head">Rate of deterioration: Cell 82 trajectory</div>
+    <div class="alert-body">29-Apr: −9mV at 52% SoC (first detection). 01-Jun: −187mV at 36% SoC (33 days later). 06-Jun: −93mV at 100% SoC after overnight balancing. 06-Jun PM: −103mV at 68% SoC post-ride.</div>
+  </div>
+
+  <div class="alert alert-green">
+    <div class="alert-head">No user-attributable cause — conservative usage throughout</div>
+    <div class="alert-body">SoC floor ≥20%. Charge rate ≤1kW. Storage at 48–50% SoC. Operating temperature 10–35°C, storage ≥15°C. ≤2.5h continuous use. No overheating events. No impact damage. No deep discharge cycles.</div>
+  </div>
+</div>
+
+<!-- ── S3: USAGE PROFILE ── -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">03</span>
+    <span class="section-title">Usage profile</span>
+    <div class="section-line"></div>
+  </div>
+  <div class="usage-grid">
+    <div class="usage-card">
+      <div class="usage-label">SoC floor</div>
+      <div class="usage-value">Never below 20%</div>
+      <div class="usage-desc">Prevents deep discharge stress on weak cells</div>
+    </div>
+    <div class="usage-card">
+      <div class="usage-label">Charge rate</div>
+      <div class="usage-value">≤1 kW</div>
+      <div class="usage-desc">Sub-maximum throughout. Low rate minimises thermal stress</div>
+    </div>
+    <div class="usage-card">
+      <div class="usage-label">Storage SoC</div>
+      <div class="usage-value">48–50%</div>
+      <div class="usage-desc">Confirmed to significantly reduce self-discharge vs 75% storage</div>
+    </div>
+    <div class="usage-card">
+      <div class="usage-label">Temperature</div>
+      <div class="usage-value">10–35°C operating</div>
+      <div class="usage-desc">Storage ≥15°C. Optimal range for lithium-ion chemistry throughout</div>
+    </div>
+    <div class="usage-card">
+      <div class="usage-label">Riding style</div>
+      <div class="usage-value">Low–moderate output</div>
+      <div class="usage-desc">≤2.5h continuous. No sustained high-current discharge events</div>
+    </div>
+    <div class="usage-card">
+      <div class="usage-label">Balancing</div>
+      <div class="usage-value">Regular full charges</div>
+      <div class="usage-desc">Pack balanced every few weeks. Long balancing tails noted and accepted</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── S4: COMPLETE READING HISTORY ── -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">04</span>
+    <span class="section-title">Complete reading history — 15 confirmed sessions</span>
+    <div class="section-line"></div>
+  </div>
+  <div style="overflow-x:auto; border-radius:10px; border:1px solid var(--border);">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>SoC</th>
+        <th>Delta</th>
+        <th>Outlier cells (JSON idx)</th>
+        <th>App alert</th>
+        <th>Assessment</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="row-normal">
+        <td class="td-date green">07-Mar</td>
+        <td class="td-mono">23%</td>
+        <td class="td-mono td-green">0.036v</td>
+        <td class="td-muted">—</td>
+        <td class="td-muted">Cell Group #73, #50 low</td>
+        <td class="td-muted">Baseline. Pack healthy.</td>
+      </tr>
+      <tr class="row-normal">
+        <td class="td-date green">08-Mar</td>
+        <td class="td-mono">~100%</td>
+        <td class="td-mono td-green">0.013v</td>
+        <td class="td-muted">—</td>
+        <td class="td-muted">Post-balance reference</td>
+        <td class="td-muted">Cleanest reading in dataset. All cells 4.180–4.194v.</td>
+      </tr>
+      <tr class="row-normal">
+        <td class="td-date green">15-Mar</td>
+        <td class="td-mono">75%</td>
+        <td class="td-mono td-green">0.021v</td>
+        <td class="td-muted">c6, c28, c78 mild</td>
+        <td class="td-muted">Mild lag — recoverable</td>
+        <td class="td-muted">First appearance of chronic balancing-lag cluster.</td>
+      </tr>
+      <tr class="row-warn">
+        <td class="td-date orange">21-Mar</td>
+        <td class="td-mono">23%</td>
+        <td class="td-mono td-orange">0.086v</td>
+        <td class="td-orange">c74 −79mV</td>
+        <td class="td-muted">Pack Voltage Delta Very High</td>
+        <td class="td-muted">Cell 74 self-discharge after 6 idle days from 75% SoC. Later recovered.</td>
+      </tr>
+      <tr class="row-warn">
+        <td class="td-date orange">25-Mar AM</td>
+        <td class="td-mono">100%</td>
+        <td class="td-mono td-orange">0.035v</td>
+        <td class="td-orange">c74 −7mV</td>
+        <td class="td-muted">Post-balance: delta elevated</td>
+        <td class="td-muted">Partial recovery after balance. 7mV residual at full charge.</td>
+      </tr>
+      <tr class="row-normal">
+        <td class="td-date green">25-Mar PM</td>
+        <td class="td-mono">48%</td>
+        <td class="td-mono td-green">0.016v</td>
+        <td class="td-muted">c74 −8mV</td>
+        <td class="td-muted">Clean post-ride</td>
+        <td class="td-muted">Stored at 48% SoC.</td>
+      </tr>
+      <tr class="row-normal">
+        <td class="td-date green">06-Apr</td>
+        <td class="td-mono">100%</td>
+        <td class="td-mono td-green">0.009v</td>
+        <td class="td-muted">c74 −2mV</td>
+        <td class="td-muted">Best post-balance yet</td>
+        <td class="td-muted">Slow overnight charge. Cell 74 near-normal.</td>
+      </tr>
+      <tr class="row-normal">
+        <td class="td-date green">07-Apr</td>
+        <td class="td-mono">61%</td>
+        <td class="td-mono td-green">0.018v</td>
+        <td class="td-muted">c50, c51 mild</td>
+        <td class="td-muted">Cell Group #50 low</td>
+        <td class="td-muted">c50/51 inversion pattern — high at 100%, low after ride.</td>
+      </tr>
+      <tr class="row-normal">
+        <td class="td-date green">19-Apr AM</td>
+        <td class="td-mono">100%</td>
+        <td class="td-mono td-green">0.027v</td>
+        <td class="td-muted">c49, c50 high</td>
+        <td class="td-muted">Cell Group #49, #50 High</td>
+        <td class="td-muted">Balancing-lag inversion. Cells 49/50 arrive at full charge first.</td>
+      </tr>
+      <tr class="row-normal">
+        <td class="td-date green">19-Apr PM</td>
+        <td class="td-mono">83%</td>
+        <td class="td-mono td-green">0.006v</td>
+        <td class="td-muted">—</td>
+        <td class="td-muted">faultBits = 0 · first time</td>
+        <td class="td-muted">Cleanest post-ride reading. Cell 74 −0.5mV.</td>
+      </tr>
+      <tr class="row-warn">
+        <td class="td-date orange">29-Apr</td>
+        <td class="td-mono">52%</td>
+        <td class="td-mono td-orange">0.030v</td>
+        <td class="td-orange">c6 −25mV, c60 −18mV</td>
+        <td class="td-muted">Cell Group #5 Low</td>
+        <td class="td-muted">Cell 6 emerges as primary outlier. Cell 60 secondary. Cell 82 at −9mV.</td>
+      </tr>
+      <tr class="row-normal">
+        <td class="td-date green">20-May</td>
+        <td class="td-mono">100%</td>
+        <td class="td-mono td-green">0.039v</td>
+        <td class="td-muted">c50+c51 high</td>
+        <td class="td-muted">Cell Group #49+50 High</td>
+        <td class="td-muted">Cell 60 and cell 82 normal at this reading. Firmware BMS 1.6.0.</td>
+      </tr>
+      <tr class="row-red">
+        <td class="td-date red">01-Jun</td>
+        <td class="td-mono">36%</td>
+        <td class="td-mono td-red">0.193v</td>
+        <td class="td-red">c82 −187mV, c60 −25mV</td>
+        <td class="td-muted">Pack Voltage Delta CRITICALLY HIGH</td>
+        <td class="td-red">CRITICAL. Cell 82 collapses 187mV below average. Largest deviation in dataset.</td>
+      </tr>
+      <tr class="row-red">
+        <td class="td-date red">06-Jun AM</td>
+        <td class="td-mono">100%</td>
+        <td class="td-mono td-red">0.127v</td>
+        <td class="td-red">c82 −93mV, c60 −46mV</td>
+        <td class="td-muted">Pack Voltage Delta Critically High</td>
+        <td class="td-red">CRITICAL. Cell 82 visible at full charge. Balancing failed to recover it.</td>
+      </tr>
+      <tr class="row-red">
+        <td class="td-date red">06-Jun PM</td>
+        <td class="td-mono">68%</td>
+        <td class="td-mono td-red">0.108v</td>
+        <td class="td-red">c82 −103mV, c60 −24mV</td>
+        <td class="td-muted">Pack Voltage Delta Critically High</td>
+        <td class="td-red">Post-ride: cell 82 deficit increases. Deterioration accelerating.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <p style="font-size:11px;color:var(--dim);margin-top:10px;font-family:'Azeret Mono',monospace;">Note: All cell numbers refer to JSON array indices (1-based) from the raw BMS data. The Svag app's cell numbering does not match JSON indices. Data analysed using Claude AI (Anthropic).</p>
+</div>
+
+<!-- ── S5: PACK DELTA CHART ── -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">05</span>
+    <span class="section-title">Pack voltage delta — trend over time</span>
+    <div class="section-line"></div>
+  </div>
+  <div class="chart-container">
+    <div class="chart-title">Pack delta (v) · all sessions · colour coded by severity</div>
+    <svg id="deltaChart" viewBox="0 0 1040 260" style="width:100%;display:block;" font-family="'Azeret Mono',monospace"></svg>
+    <div class="chart-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>≥0.1v — critical</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--orange)"></div>0.04–0.1v — warning</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>&lt;0.04v — normal</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── S6: CELL 82 TRAJECTORY ── -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">06</span>
+    <span class="section-title">Cell 82 — trajectory</span>
+    <div class="section-line"></div>
+  </div>
+  <div class="trajectory">
+    <div class="traj-row">
+      <div class="traj-date">Before 29-Apr</div>
+      <div class="traj-soc">Various SoC</div>
+      <div class="traj-val" style="color:var(--green)">Normal</div>
+      <div class="traj-desc">Within normal range in all prior readings. Not flagged in any snapshot.</div>
+    </div>
+    <div class="traj-row">
+      <div class="traj-date">29 April</div>
+      <div class="traj-soc">52% SoC</div>
+      <div class="traj-val" style="color:var(--muted)">−9 mV</div>
+      <div class="traj-desc">First appearance. Not flagged by app.</div>
+    </div>
+    <div class="traj-row">
+      <div class="traj-date">20 May</div>
+      <div class="traj-soc">100% SoC</div>
+      <div class="traj-val" style="color:var(--green)">−0.1 mV</div>
+      <div class="traj-desc">Normal at full charge.</div>
+    </div>
+    <div class="traj-row">
+      <div class="traj-date">01 June</div>
+      <div class="traj-soc">36% SoC</div>
+      <div class="traj-val" style="color:var(--red)">−187 mV</div>
+      <div class="traj-desc">Pack delta 0.193v. App: "Pack Voltage Delta Critically High." Post-ride, no prior idle period.</div>
+    </div>
+    <div class="traj-row">
+      <div class="traj-date">06 June AM</div>
+      <div class="traj-soc">100% post-charge</div>
+      <div class="traj-val" style="color:var(--red)">−93 mV</div>
+      <div class="traj-desc">Visible at full charge after overnight balancing. Balancer unable to reconcile deficit.</div>
+    </div>
+    <div class="traj-row">
+      <div class="traj-date">06 June PM</div>
+      <div class="traj-soc">68% post-ride</div>
+      <div class="traj-val" style="color:var(--red)">−103 mV</div>
+      <div class="traj-desc">Pack delta 0.108v. Deficit increases during discharge.</div>
+    </div>
+  </div>
+  <div style="margin-top:16px;">
+    <div class="alert alert-red">
+      <div class="alert-head">33 days · −9mV → −187mV · now −93mV at 100% SoC</div>
+      <div class="alert-body">First detection 29-Apr (−9mV). Critical failure 01-Jun (−187mV). 93mV residual after overnight balancing on 06-Jun — balancer at maximum capacity. Delta 0.108v post-ride at 68% SoC.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── S7: SELF DISCHARGE ── -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">07</span>
+    <span class="section-title">Cell 74 — self-discharge event (21 March)</span>
+    <div class="section-line"></div>
+  </div>
+  <div class="alert alert-blue">
+    <div class="alert-head">Cell 74 showed elevated self-discharge at rest — a recognised precursor to cell failure</div>
+    <div class="alert-body">15-Mar: cell 74 −1mV (normal). 21-Mar: cell 74 −79mV. Bike not ridden in between — 6 idle days at 75% SoC. Cell 74 subsequently recovered: −0.5mV by 19-Apr.</div>
+  </div>
+</div>
+
+<!-- ── S8: BALANCING THRESHOLD ── -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">08</span>
+    <span class="section-title">Cell deviation at 100% SoC — all balance sessions</span>
+    <div class="section-line"></div>
+  </div>
+  <div style="overflow-x:auto; border-radius:10px; border:1px solid var(--border); margin-bottom:16px;">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Reading</th>
+        <th>Cell</th>
+        <th>Voltage at 100% SoC</th>
+        <th>Pack average</th>
+        <th>Deviation</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="row-normal">
+        <td class="td-muted">08-Mar (reference)</td>
+        <td class="td-muted">All cells</td>
+        <td class="td-mono">4.180–4.194v</td>
+        <td class="td-mono">4.184v</td>
+        <td class="td-mono td-green">±4mV</td>
+        <td><span class="td-badge badge-green">Normal</span></td>
+      </tr>
+      <tr class="row-normal">
+        <td class="td-muted">25-Mar AM</td>
+        <td class="td-muted">Cell 74</td>
+        <td class="td-mono">4.159v</td>
+        <td class="td-mono">4.166v</td>
+        <td class="td-mono td-orange">−7mV</td>
+        <td><span class="td-badge badge-orange">Mild residual</span></td>
+      </tr>
+      <tr class="row-normal">
+        <td class="td-muted">06-Apr</td>
+        <td class="td-muted">Cell 74</td>
+        <td class="td-mono">4.186v</td>
+        <td class="td-mono">4.188v</td>
+        <td class="td-mono td-green">−2mV</td>
+        <td><span class="td-badge badge-green">Recovered</span></td>
+      </tr>
+      <tr class="row-normal">
+        <td class="td-muted">20-May</td>
+        <td class="td-muted">Cell 60</td>
+        <td class="td-mono">4.155v</td>
+        <td class="td-mono">4.159v</td>
+        <td class="td-mono td-orange">−4mV</td>
+        <td><span class="td-badge badge-muted">Marginal</span></td>
+      </tr>
+      <tr class="row-red">
+        <td class="td-muted">06-Jun AM</td>
+        <td class="td-red" style="font-weight:600">Cell 82</td>
+        <td class="td-mono td-red">4.068v</td>
+        <td class="td-mono">4.161v</td>
+        <td class="td-mono td-red">−93mV</td>
+        <td><span class="td-badge badge-red">Critical — fail</span></td>
+      </tr>
+      <tr class="row-red">
+        <td class="td-muted">06-Jun AM</td>
+        <td class="td-orange" style="font-weight:600">Cell 60</td>
+        <td class="td-mono td-orange">4.115v</td>
+        <td class="td-mono">4.161v</td>
+        <td class="td-mono td-orange">−46mV</td>
+        <td><span class="td-badge badge-orange">Significant</span></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="findings-grid">
+
+  </div>
+</div>
+
+
+
+<!-- ── FOOTER ── -->
+<footer class="footer">
+  <div>
+    <div class="footer-mono">VIN: UDUEX1AE6SA006014 · 2025 Stark Varg EX</div>
+    <div style="margin-top:4px">13 diagnostic JSON files and all screenshot records available on request.</div>
+  </div>
+  <div class="footer-mono" style="text-align:right">
+    Prepared June 2026<br>
+    App: Svag · Analysis: Claude AI (Anthropic)
+  </div>
+</footer>
+
+</div><!-- /page -->
+
+<script>
+// ── BAR CHART ──────────────────────────────────────────────
+const sessions = [
+  { label: "07-Mar\n23%",    delta: 0.036 },
+  { label: "08-Mar\n~100%",  delta: 0.013 },
+  { label: "15-Mar\n75%",    delta: 0.021 },
+  { label: "21-Mar\n23%",    delta: 0.086 },
+  { label: "25-Mar\n100%",   delta: 0.035 },
+  { label: "25-Mar\n48%",    delta: 0.016 },
+  { label: "06-Apr\n100%",   delta: 0.009 },
+  { label: "07-Apr\n61%",    delta: 0.018 },
+  { label: "19-Apr\n100%",   delta: 0.027 },
+  { label: "19-Apr\n83%",    delta: 0.006 },
+  { label: "29-Apr\n52%",    delta: 0.030 },
+  { label: "20-May\n100%",   delta: 0.039 },
+  { label: "01-Jun\n36%",    delta: 0.193 },
+  { label: "06-Jun\n100%",   delta: 0.127 },
+  { label: "06-Jun\n68%",    delta: 0.108 },
+];
+
+const svg = document.getElementById('deltaChart');
+const W = 1040, H = 260;
+const pad = { top: 28, right: 20, bottom: 52, left: 48 };
+const chartW = W - pad.left - pad.right;
+const chartH = H - pad.top - pad.bottom;
+const maxVal = 0.22;
+const barW = chartW / sessions.length;
+const barPad = barW * 0.22;
+
+function color(d) {
+  if (d >= 0.1)   return '#e03c3c';
+  if (d >= 0.04)  return '#f0833a';
+  return '#28c76f';
+}
+function labelColor(d) {
+  if (d >= 0.1)   return '#f08080';
+  if (d >= 0.04)  return '#f5aa70';
+  return '#70d49a';
+}
+
+let html = '';
+
+// grid lines
+[0, 0.05, 0.10, 0.15, 0.20].forEach(v => {
+  const y = pad.top + chartH - (v / maxVal) * chartH;
+  const isThreshold = v === 0.10;
+  html += `<line x1="${pad.left}" y1="${y}" x2="${W - pad.right}" y2="${y}"
+    stroke="${isThreshold ? '#e03c3c' : '#22243a'}"
+    stroke-width="${isThreshold ? 1 : 0.5}"
+    stroke-dasharray="${isThreshold ? '4 3' : ''}"/>`;
+  html += `<text x="${pad.left - 6}" y="${y + 4}" text-anchor="end" fill="#7077a0"
+    font-size="10" font-family="'Azeret Mono',monospace">${v.toFixed(2)}</text>`;
+});
+
+// threshold label
+const threshY = pad.top + chartH - (0.10 / maxVal) * chartH;
+html += `<text x="${W - pad.right - 4}" y="${threshY - 4}" text-anchor="end" fill="#e03c3c" font-size="9" font-family="'Azeret Mono',monospace">critical threshold</text>`;
+
+// bars
+sessions.forEach((s, i) => {
+  const bh = (s.delta / maxVal) * chartH;
+  const bx = pad.left + i * barW + barPad;
+  const by = pad.top + chartH - bh;
+  const bww = barW - barPad * 2;
+  const c = color(s.delta);
+  const lc = labelColor(s.delta);
+
+  // bar
+  html += `<rect x="${bx}" y="${by}" width="${bww}" height="${bh}"
+    fill="${c}" rx="2" opacity="0.85"/>`;
+
+  // value label
+  const lblY = by - 5;
+  html += `<text x="${bx + bww/2}" y="${lblY}" text-anchor="middle"
+    fill="${lc}" font-size="9" font-family="'Azeret Mono',monospace" font-weight="600">${s.delta.toFixed(3)}</text>`;
+
+  // x-axis label (two lines)
+  const parts = s.label.split('\n');
+  const lx = bx + bww / 2;
+  const ly = pad.top + chartH + 14;
+  html += `<text x="${lx}" y="${ly}" text-anchor="middle" fill="#7077a0"
+    font-size="9" font-family="'Azeret Mono',monospace">${parts[0]}</text>`;
+  if (parts[1]) {
+    html += `<text x="${lx}" y="${ly + 13}" text-anchor="middle" fill="#3a3d5c"
+      font-size="8" font-family="'Azeret Mono',monospace">${parts[1]}</text>`;
+  }
+});
+
+// x-axis baseline
+html += `<line x1="${pad.left}" y1="${pad.top + chartH}" x2="${W - pad.right}" y2="${pad.top + chartH}" stroke="#22243a" stroke-width="1"/>`;
+
+svg.innerHTML = html;
+</script>
+
+</body>
+</html>
